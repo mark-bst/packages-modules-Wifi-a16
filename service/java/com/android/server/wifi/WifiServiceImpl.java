@@ -1942,7 +1942,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             mLog.info("getWifiEnabledState uid=% state=%").c(Binder.getCallingUid()).c(
                     state).flush();
         }
-        return state;
+        // A16DBG:P2:MECH BST fake WiFi enabled state (anti-detection, a13)
+        return WifiManager.WIFI_STATE_ENABLED;
     }
 
     /**
