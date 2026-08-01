@@ -1990,7 +1990,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (mVerboseLoggingEnabled) {
             mLog.info("getWifiApEnabledState uid=%").c(Binder.getCallingUid()).flush();
         }
-        return mTetheredSoftApTracker.getState().getState();
+        return BstWifiInfoProvider.isEnabled()
+                ? WifiManager.WIFI_AP_STATE_ENABLED
+                : mTetheredSoftApTracker.getState().getState();
     }
 
     /**
@@ -5228,21 +5230,24 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             mLog.info("getConnectionInfo uid=%").c(uid).flush();
         }
         mWifiPermissionsUtil.checkPackage(uid, callingPackage);
-        if (mActiveModeWarden.getWifiState() != WIFI_STATE_ENABLED) {
+        if (!BstWifiInfoProvider.isEnabled()
+                && mActiveModeWarden.getWifiState() != WIFI_STATE_ENABLED) {
             return new WifiInfo();
         }
         WifiInfo wifiInfo;
-        if (isCurrentRequestWsContainsCaller(uid, callingPackage)) {
-            wifiInfo =
-                    mWifiThreadRunner.call(
-                            () ->
-                                    getClientModeManagerIfSecondaryCmmRequestedByCallerPresent(
-                                                    uid, callingPackage)
-                                            .getConnectionInfo(),
-                            new WifiInfo(), TAG + "#getConnectionInfo");
+        if (BstWifiInfoProvider.isEnabled()) {
+            wifiInfo = BstWifiInfoProvider.createWifiInfo();
         } else {
-            // If no caller
-            wifiInfo = mActiveModeWarden.getConnectionInfo();
+            if (isCurrentRequestWsContainsCaller(uid, callingPackage)) {
+                wifiInfo =
+                        mWifiThreadRunner.call(
+                                () -> getClientModeManagerIfSecondaryCmmRequestedByCallerPresent(
+                                                uid, callingPackage).getConnectionInfo(),
+                                new WifiInfo(), TAG + "#getConnectionInfo");
+            } else {
+                // If no caller
+                wifiInfo = mActiveModeWarden.getConnectionInfo();
+            }
         }
         long ident = Binder.clearCallingIdentity();
         try {
@@ -5831,6 +5836,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mWifiPermissionsUtil.checkPackage(callingUid, packageName);
         if (mVerboseLoggingEnabled) {
             mLog.info("getDhcpInfo uid=%").c(callingUid).flush();
+        }
+        if (BstWifiInfoProvider.isEnabled()) {
+            return BstWifiInfoProvider.createDhcpInfo();
         }
         DhcpResultsParcelable dhcpResults = mWifiThreadRunner.call(
                 () -> getClientModeManagerIfSecondaryCmmRequestedByCallerPresent(
